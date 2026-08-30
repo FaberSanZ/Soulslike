@@ -3,24 +3,37 @@
 
 #include <iostream>
 #include "GameWindow.h"
+#include "GameBase.h"
+
+using namespace Engine;
+
+class MyGame final : public GameBase
+{
+protected:
+	void OnInitialize() override
+	{
+
+	}
+
+	void OnUpdate(float deltaTime) override
+	{
+
+	}
+
+	void OnFixedUpdate() override
+	{
+	}
+
+	void OnShutdown() override
+	{
+
+	}
+};
 
 int main()
 {
-	Engine::GameWindow window;
-	window.Initialize();
-	window.SetTitle(L"Engine Game Window");
-	window.SetWindowSize(800, 600);
-
-	while (window.IsRunning())
-	{
-		window.PumpMessages();
-
-		if (Engine::GameInput::IsKeyPressed(Engine::GameInput::KeyCode::C))
-			break;
-
-	}
-	window.Shutdown();
-	
+	MyGame game;
+	game.Run();
 
 	return 0;
 }
