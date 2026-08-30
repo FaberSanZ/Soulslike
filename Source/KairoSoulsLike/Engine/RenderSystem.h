@@ -12,6 +12,7 @@ namespace Engine
 		{
 			// Initialize rendering system
 			m_renderingDevice.Initialize();
+			m_adapter = m_renderingDevice.CreateAdapter(0); // Select the first GPU adapter
 		}
 
 		void BeginFrame()
@@ -40,6 +41,7 @@ namespace Engine
 
 	private:
 		RenderingDevice m_renderingDevice;
+		Adapter m_adapter; // gpu selected adapter
 	};
 
 
