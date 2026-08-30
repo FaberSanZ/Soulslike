@@ -18,7 +18,7 @@ namespace Engine
 
 			OnInitialize();
 
-			m_renderSystem.Initialize();
+			m_renderSystem.Initialize(m_window.Handle(), m_window.ClientWidth(), m_window.ClientHeight());
 
 			while (m_window.IsRunning())
 			{
