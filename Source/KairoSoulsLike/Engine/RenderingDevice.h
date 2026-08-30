@@ -74,6 +74,15 @@ namespace Engine
 		DescriptorHeap m_rtvHeap;
 	};
 
+
+	class CommandList
+	{
+	private:
+		friend class RenderingDevice;
+		ID3D12CommandAllocator* m_commandAllocator = nullptr;
+		ID3D12GraphicsCommandList* m_commandList = nullptr;
+	};
+
 	class RenderingDevice
 	{
 	public:
@@ -166,6 +175,40 @@ namespace Engine
 			heap.m_DescriptorSize = adapter.m_device->GetDescriptorHandleIncrementSize(type);
 
 			return heap;
+		}
+
+
+		CommandList CreateCommandList(Adapter& adapter)
+		{
+			CommandList commandList;
+
+			adapter.m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandList.m_commandAllocator));
+			adapter.m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandList.m_commandAllocator, nullptr, IID_PPV_ARGS(&commandList.m_commandList));
+			return commandList;
+		}
+
+
+		void BeginFrame(CommandList& commandList)
+		{
+			commandList.m_commandAllocator->Reset();
+			commandList.m_commandList->Reset(commandList.m_commandAllocator, nullptr);
+		}	
+
+		void Clear(CommandList& commandList, Texture& renderTarget, const float clearColor[4])
+		{
+			commandList.m_commandList->ClearRenderTargetView(renderTarget.m_rtv, clearColor, 0, nullptr);
+		}
+
+		void Execute(CommandQueue& commandQueue, CommandList& commandList)
+		{
+			ID3D12CommandList* listsToExecute[] = { commandList.m_commandList };
+			commandQueue.m_queue->ExecuteCommandLists(1, listsToExecute);
+		}
+
+
+		void EndFrame(CommandList& commandList)
+		{
+			commandList.m_commandList->Close();
 		}
 
 		void Present(SwapChain& swapChain, uint32_t syncInterval = 1, uint32_t flags = 0)
