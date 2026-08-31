@@ -106,7 +106,12 @@ namespace Engine
 	struct MeshPart
 	{
 		Buffer m_vertexBuffer;
+		Buffer m_indexBuffer;
+
+		D3D12_INDEX_BUFFER_VIEW m_indexBufferView{};
+
 		uint32_t m_vertexCount = 0;
+		uint32_t m_indexCount = 0;
 	};
 
 	class RenderingDevice
@@ -288,18 +293,24 @@ namespace Engine
 			buffer.m_resource->Map(0, nullptr, &mappedData);
 			memcpy(mappedData, data, size);
 			buffer.m_resource->Unmap(0, nullptr);
-
 			buffer.m_size = size;
 
 			return buffer;
 		}
 
-		MeshPart CreateMeshPart(Adapter& adapter, const void* vertexData, uint32_t vertexSize, uint32_t vertexCount)
+		MeshPart CreateMeshPart(Adapter& adapter, const void* vertexData, uint32_t vertexSize, uint32_t vertexCount, const void* indexData, uint32_t indexSize, uint32_t indexCount)
 		{
 			MeshPart meshPart;
 
 			meshPart.m_vertexBuffer = CreateBuffer(adapter, vertexData, vertexSize);
+			meshPart.m_indexBuffer = CreateBuffer(adapter, indexData, indexSize);
+
 			meshPart.m_vertexCount = vertexCount;
+			meshPart.m_indexCount = indexCount;
+
+			meshPart.m_indexBufferView.BufferLocation = meshPart.m_indexBuffer.m_resource->GetGPUVirtualAddress();
+			meshPart.m_indexBufferView.SizeInBytes = indexSize;
+			meshPart.m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
 
 			return meshPart;
 		}
@@ -307,8 +318,9 @@ namespace Engine
 		void DrawMeshPart(CommandList& commandList, MeshPart& meshPart)
 		{
 			commandList.m_commandList->SetGraphicsRootShaderResourceView(0, meshPart.m_vertexBuffer.m_resource->GetGPUVirtualAddress());
+			commandList.m_commandList->IASetIndexBuffer(&meshPart.m_indexBufferView);
 			commandList.m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			commandList.m_commandList->DrawInstanced(meshPart.m_vertexCount, 1, 0, 0);
+			commandList.m_commandList->DrawIndexedInstanced(meshPart.m_indexCount, 1, 0, 0, 0);
 		}
 
 		void BeginFrame(CommandList& commandList)

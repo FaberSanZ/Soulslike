@@ -45,13 +45,19 @@ namespace Engine
 
 			Vertex vertices[] =
 			{
-				{ { 0.0f, 0.5f, 0.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-				{ { 0.5f, -0.5f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-				{ { -0.5f, -0.5f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
+				{ { -0.5f,  0.5f, 0.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+				{ {  0.5f,  0.5f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+				{ {  0.5f, -0.5f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+				{ { -0.5f, -0.5f, 0.0f, 1.0f }, { 1.0f, 0.0f, 1.0f, 1.0f } }
 			};
 
-			m_meshPart = m_renderingDevice.CreateMeshPart(m_adapter, vertices, sizeof(vertices), 3);
+			uint32_t indices[] =
+			{
+				0, 1, 2,
+				0, 2, 3
+			};
 
+			m_meshPart = m_renderingDevice.CreateMeshPart(m_adapter, vertices, sizeof(vertices), 4, indices, sizeof(indices), 6);
 
 		}
 
