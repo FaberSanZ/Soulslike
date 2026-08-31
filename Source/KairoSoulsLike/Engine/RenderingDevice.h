@@ -4,6 +4,8 @@
 #include <vector>
 #include <dxgi1_4.h>
 #include <d3d12.h>
+#include "ShadersSystem.h"
+#include "ShadersSystem.h"
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -74,6 +76,14 @@ namespace Engine
 		DescriptorHeap m_rtvHeap;
 	};
 
+
+	class PipelineState
+	{
+	private:
+		friend class RenderingDevice;
+		ID3D12RootSignature* m_rootSignature = nullptr;
+		ID3D12PipelineState* m_pipelineState = nullptr;
+	};
 
 	class CommandList
 	{
@@ -161,6 +171,53 @@ namespace Engine
 			return swapChain;
 		}
 
+		PipelineState CreatePipelineState(Adapter& adapter, ShadersSystem& shaders)
+		{
+			PipelineState pipelineState;
+
+			IDxcBlob* vertexShader = shaders.Compile(L"Assets/Shaders/Vertex.hlsl", L"VS", L"vs_6_0");
+			IDxcBlob* pixelShader = shaders.Compile(L"Assets/Shaders/Pixel.hlsl", L"PS", L"ps_6_0");
+
+			D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc{};
+			rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+			ID3DBlob* rootSignatureBlob = nullptr;
+			ID3DBlob* errorBlob = nullptr;
+
+			D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootSignatureBlob, &errorBlob);
+			adapter.m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&pipelineState.m_rootSignature));
+
+
+			D3D12_RASTERIZER_DESC rasterizerDesc{};
+			rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
+			rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+			rasterizerDesc.FrontCounterClockwise = FALSE;
+			rasterizerDesc.DepthClipEnable = TRUE;
+
+			D3D12_BLEND_DESC blendDesc{};
+			blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineDesc{};
+			pipelineDesc.pRootSignature = pipelineState.m_rootSignature;
+			pipelineDesc.VS = { vertexShader->GetBufferPointer(), vertexShader->GetBufferSize() };
+			pipelineDesc.PS = { pixelShader->GetBufferPointer(), pixelShader->GetBufferSize() };
+			pipelineDesc.BlendState = blendDesc;
+			pipelineDesc.RasterizerState = rasterizerDesc;
+			pipelineDesc.DepthStencilState.DepthEnable = FALSE;
+			pipelineDesc.DepthStencilState.StencilEnable = FALSE;
+			pipelineDesc.SampleMask = UINT_MAX;
+			pipelineDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			pipelineDesc.NumRenderTargets = 1;
+			pipelineDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			pipelineDesc.SampleDesc.Count = 1;
+
+			adapter.m_device->CreateGraphicsPipelineState(&pipelineDesc, IID_PPV_ARGS(&pipelineState.m_pipelineState));
+
+
+			return pipelineState;
+		}
+
+
 		DescriptorHeap InitializeDescriptorHeap(Adapter& adapter, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT numDescriptors)
 		{
 			DescriptorHeap heap;
@@ -184,6 +241,7 @@ namespace Engine
 
 			adapter.m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandList.m_commandAllocator));
 			adapter.m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandList.m_commandAllocator, nullptr, IID_PPV_ARGS(&commandList.m_commandList));
+			commandList.m_commandList->Close();
 			return commandList;
 		}
 
@@ -215,6 +273,33 @@ namespace Engine
 		{
 			swapChain.m_swapChain->Present(syncInterval, flags);
 			swapChain.m_backBufferIndex = swapChain.m_swapChain->GetCurrentBackBufferIndex();
+		}
+
+		void SetRenderTarget(CommandList& commandList, Texture& renderTarget)
+		{
+			commandList.m_commandList->OMSetRenderTargets(1, &renderTarget.m_rtv, FALSE, nullptr);
+		}
+
+		void SetViewport(CommandList& commandList, uint32_t width, uint32_t height)
+		{
+			D3D12_VIEWPORT viewport{ 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f };
+			D3D12_RECT scissor{ 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
+
+			commandList.m_commandList->RSSetViewports(1, &viewport);
+			commandList.m_commandList->RSSetScissorRects(1, &scissor);
+		}
+
+
+		void SetPipelineState(CommandList& commandList, PipelineState& pipelineState)
+		{
+			commandList.m_commandList->SetPipelineState(pipelineState.m_pipelineState);
+			commandList.m_commandList->SetGraphicsRootSignature(pipelineState.m_rootSignature);
+		}
+
+		void Draw(CommandList& commandList, uint32_t vertexCount)
+		{
+			commandList.m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			commandList.m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
 		}
 	};
 }

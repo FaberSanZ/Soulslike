@@ -17,8 +17,8 @@ namespace Engine
 			m_window.SetWindowSize(800, 600);
 
 			OnInitialize();
-
-			m_renderSystem.Initialize(m_window.Handle(), m_window.ClientWidth(), m_window.ClientHeight());
+			
+			m_renderSystem.Initialize(m_window.Handle(), m_window.ClientWidth(), m_window.ClientHeight(), m_shadersSystem);
 
 			while (m_window.IsRunning())
 			{
@@ -47,6 +47,7 @@ namespace Engine
 	private:
 		GameWindow m_window;
 		RenderSystem m_renderSystem;
+		ShadersSystem m_shadersSystem;
 
 	};
 

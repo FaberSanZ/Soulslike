@@ -32,5 +32,8 @@
     <ClInclude Include="RenderingDevice.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ShadersSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
