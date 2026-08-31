@@ -36,7 +36,6 @@ namespace Engine
 			m_pipelineState = m_renderingDevice.CreatePipelineState(m_adapter, shaders);
 
 
-
 			struct Vertex
 			{
 				float position[4];
