@@ -1,10 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
 #include <vector>
 #include <dxgi1_4.h>
 #include <d3d12.h>
-#include "ShadersSystem.h"
 #include "ShadersSystem.h"
 
 #pragma comment(lib, "dxgi.lib")
@@ -76,11 +76,11 @@ namespace Engine
 		DescriptorHeap m_rtvHeap;
 	};
 
-
 	class PipelineState
 	{
 	private:
 		friend class RenderingDevice;
+
 		ID3D12RootSignature* m_rootSignature = nullptr;
 		ID3D12PipelineState* m_pipelineState = nullptr;
 	};
@@ -89,8 +89,24 @@ namespace Engine
 	{
 	private:
 		friend class RenderingDevice;
+
 		ID3D12CommandAllocator* m_commandAllocator = nullptr;
 		ID3D12GraphicsCommandList* m_commandList = nullptr;
+	};
+
+	class Buffer
+	{
+	private:
+		friend class RenderingDevice;
+
+		ID3D12Resource* m_resource = nullptr;
+		uint32_t m_size = 0;
+	};
+
+	struct MeshPart
+	{
+		Buffer m_vertexBuffer;
+		uint32_t m_vertexCount = 0;
 	};
 
 	class RenderingDevice
@@ -178,15 +194,21 @@ namespace Engine
 			IDxcBlob* vertexShader = shaders.Compile(L"Assets/Shaders/Vertex.hlsl", L"VS", L"vs_6_0");
 			IDxcBlob* pixelShader = shaders.Compile(L"Assets/Shaders/Pixel.hlsl", L"PS", L"ps_6_0");
 
+			D3D12_ROOT_PARAMETER vertexBufferParameter{};
+			vertexBufferParameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+			vertexBufferParameter.Descriptor.ShaderRegister = 0;
+			vertexBufferParameter.Descriptor.RegisterSpace = 0;
+			vertexBufferParameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
 			D3D12_ROOT_SIGNATURE_DESC rootSignatureDesc{};
-			rootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+			rootSignatureDesc.NumParameters = 1;
+			rootSignatureDesc.pParameters = &vertexBufferParameter;
 
 			ID3DBlob* rootSignatureBlob = nullptr;
 			ID3DBlob* errorBlob = nullptr;
 
 			D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &rootSignatureBlob, &errorBlob);
 			adapter.m_device->CreateRootSignature(0, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize(), IID_PPV_ARGS(&pipelineState.m_rootSignature));
-
 
 			D3D12_RASTERIZER_DESC rasterizerDesc{};
 			rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
@@ -213,10 +235,8 @@ namespace Engine
 
 			adapter.m_device->CreateGraphicsPipelineState(&pipelineDesc, IID_PPV_ARGS(&pipelineState.m_pipelineState));
 
-
 			return pipelineState;
 		}
-
 
 		DescriptorHeap InitializeDescriptorHeap(Adapter& adapter, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT numDescriptors)
 		{
@@ -234,7 +254,6 @@ namespace Engine
 			return heap;
 		}
 
-
 		CommandList CreateCommandList(Adapter& adapter)
 		{
 			CommandList commandList;
@@ -242,15 +261,61 @@ namespace Engine
 			adapter.m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandList.m_commandAllocator));
 			adapter.m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandList.m_commandAllocator, nullptr, IID_PPV_ARGS(&commandList.m_commandList));
 			commandList.m_commandList->Close();
+
 			return commandList;
 		}
 
+		Buffer CreateBuffer(Adapter& adapter, const void* data, uint32_t size)
+		{
+			Buffer buffer;
+
+			D3D12_HEAP_PROPERTIES heapProperties{};
+			heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+			D3D12_RESOURCE_DESC bufferDesc{};
+			bufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+			bufferDesc.Width = size;
+			bufferDesc.Height = 1;
+			bufferDesc.DepthOrArraySize = 1;
+			bufferDesc.MipLevels = 1;
+			bufferDesc.SampleDesc.Count = 1;
+			bufferDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+			adapter.m_device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&buffer.m_resource));
+
+			void* mappedData = nullptr;
+
+			buffer.m_resource->Map(0, nullptr, &mappedData);
+			memcpy(mappedData, data, size);
+			buffer.m_resource->Unmap(0, nullptr);
+
+			buffer.m_size = size;
+
+			return buffer;
+		}
+
+		MeshPart CreateMeshPart(Adapter& adapter, const void* vertexData, uint32_t vertexSize, uint32_t vertexCount)
+		{
+			MeshPart meshPart;
+
+			meshPart.m_vertexBuffer = CreateBuffer(adapter, vertexData, vertexSize);
+			meshPart.m_vertexCount = vertexCount;
+
+			return meshPart;
+		}
+
+		void DrawMeshPart(CommandList& commandList, MeshPart& meshPart)
+		{
+			commandList.m_commandList->SetGraphicsRootShaderResourceView(0, meshPart.m_vertexBuffer.m_resource->GetGPUVirtualAddress());
+			commandList.m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			commandList.m_commandList->DrawInstanced(meshPart.m_vertexCount, 1, 0, 0);
+		}
 
 		void BeginFrame(CommandList& commandList)
 		{
 			commandList.m_commandAllocator->Reset();
 			commandList.m_commandList->Reset(commandList.m_commandAllocator, nullptr);
-		}	
+		}
 
 		void Clear(CommandList& commandList, Texture& renderTarget, const float clearColor[4])
 		{
@@ -262,7 +327,6 @@ namespace Engine
 			ID3D12CommandList* listsToExecute[] = { commandList.m_commandList };
 			commandQueue.m_queue->ExecuteCommandLists(1, listsToExecute);
 		}
-
 
 		void EndFrame(CommandList& commandList)
 		{
@@ -289,11 +353,15 @@ namespace Engine
 			commandList.m_commandList->RSSetScissorRects(1, &scissor);
 		}
 
-
 		void SetPipelineState(CommandList& commandList, PipelineState& pipelineState)
 		{
 			commandList.m_commandList->SetPipelineState(pipelineState.m_pipelineState);
 			commandList.m_commandList->SetGraphicsRootSignature(pipelineState.m_rootSignature);
+		}
+
+		void SetVertexBuffer(CommandList& commandList, Buffer& buffer)
+		{
+			commandList.m_commandList->SetGraphicsRootShaderResourceView(0, buffer.m_resource->GetGPUVirtualAddress());
 		}
 
 		void Draw(CommandList& commandList, uint32_t vertexCount)

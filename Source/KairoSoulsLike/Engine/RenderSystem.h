@@ -3,6 +3,13 @@
 
 namespace Engine
 {
+	struct VertexPositionColor
+	{
+		float position[4];
+		float color[4];
+	};
+
+
 	class RenderSystem
 	{
 	public:
@@ -27,6 +34,25 @@ namespace Engine
 			m_swapChain = m_renderingDevice.CreateSwapChain(m_adapter, m_commandQueue, presentation);
 			m_commandList = m_renderingDevice.CreateCommandList(m_adapter);
 			m_pipelineState = m_renderingDevice.CreatePipelineState(m_adapter, shaders);
+
+
+
+			struct Vertex
+			{
+				float position[4];
+				float color[4];
+			};
+
+			Vertex vertices[] =
+			{
+				{ { 0.0f, 0.5f, 0.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+				{ { 0.5f, -0.5f, 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+				{ { -0.5f, -0.5f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
+			};
+
+			m_meshPart = m_renderingDevice.CreateMeshPart(m_adapter, vertices, sizeof(vertices), 3);
+
+
 		}
 
 		void BeginFrame()
@@ -44,7 +70,7 @@ namespace Engine
 			m_renderingDevice.Clear(m_commandList, backBuffer, clearColor);
 			m_renderingDevice.SetViewport(m_commandList, m_width, m_height);
 			m_renderingDevice.SetPipelineState(m_commandList, m_pipelineState);
-			m_renderingDevice.Draw(m_commandList, 3);
+			m_renderingDevice.DrawMeshPart(m_commandList, m_meshPart);
 		}
 
 		void EndFrame()
@@ -73,6 +99,8 @@ namespace Engine
 
 		uint32_t m_width = 0;
 		uint32_t m_height = 0;
+
+		MeshPart m_meshPart;
 	};
 
 
